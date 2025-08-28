@@ -1,0 +1,119 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Leave a Birthday Message</title><style>
+:root{--bg:#0c0f13;--panel:#11161d;--grid:#1b2631;--text:#e6eef7;--accent:#8ab4ff;--ok:#76ff7a;--bad:#ff6b6b;--border:#8ab4ff}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#0f141a;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace}
+.wrap{width:min(95vw,760px);margin:0 auto;padding:20px}
+.panel{position:relative;background:linear-gradient(180deg,#0f141a,var(--panel));border-radius:16px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05)}
+.panel:before{content:"";position:absolute;inset:10px;border-radius:12px;border:2px solid var(--border);pointer-events:none}
+header{text-align:center;margin:12px 0 18px}
+h1{margin:0;font-size:clamp(22px,3vw,34px)}
+.sub{opacity:.85;margin-top:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{font-size:12px;opacity:.9;margin-bottom:6px;display:block}
+input,select,textarea{width:100%;background:#0d1218;border:1px solid #1e2a38;color:var(--accent);border-radius:10px;padding:10px 12px;font-weight:600;font-size:13px}
+textarea{min-height:140px;resize:vertical;color:var(--text)}
+button{cursor:pointer;border:1px solid #1e2a38;background:#0d1218;color:var(--accent);border-radius:10px;padding:12px 14px;font-weight:700;font-size:13px}
+button:hover{filter:brightness(1.07)}
+.actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:10px}
+.hint{font-size:12px;opacity:.75}
+.success,.error{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:13px;border:1px solid}
+.success{border-color:#264a2f;background:#0d1811;color:var(--ok)}
+.error{border-color:#5c2b2b;background:#181011;color:var(--bad)}
+.small{font-size:11px;opacity:.8}
+hr{border:0;border-top:1px dashed #223040;margin:14px 0}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0d1218;border:1px solid #1e2a38;border-radius:10px;padding:10px;white-space:pre-wrap}
+</style></head><body>
+<div class="wrap">
+  <header>
+    <h1>✍️ Leave a Birthday Message</h1>
+    <div class="sub">Retro form to collect notes for <strong id="who">SJT</strong>. Your message appears on the grid once approved.</div>
+  </header>
+
+  <section class="panel">
+    <form id="f" novalidate>
+      <div class="row">
+        <div>
+          <label for="from">Your name</label>
+          <input id="from" name="from" required placeholder="Ada Lovelace" autocomplete="name">
+        </div>
+        <div>
+          <label for="role">Role / Team</label>
+          <input id="role" name="role" placeholder="Frontend" autocomplete="organization-title">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="email">Email (internal only, never shown)</label>
+          <input id="email" name="email" type="email" inputmode="email" placeholder="you@company.com" autocomplete="email">
+        </div>
+        <div>
+          <label for="pass">Passphrase (optional)</label>
+          <input id="pass" name="pass" placeholder="e.g. team-secret">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label for="text">Your message</label>
+        <textarea id="text" name="text" required placeholder="Write something nice…"></textarea>
+      </div>
+      <!-- honeypot to deter bots -->
+      <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+
+      <div class="actions">
+        <div class="hint">Tip: you can set ?name=SJT</div>
+        <button type="submit">Send message</button>
+      </div>
+      <div id="msg"></div>
+    </form>
+
+    <hr>
+
+    <details>
+      <summary class="small">No backend yet? Use local preview mode</summary>
+      <div class="small">Submissions are saved to your browser and shown below as JSON you can export to the messages page.</div>
+      <pre id="preview" class="code">[]</pre>
+    </details>
+  </section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const params=new URLSearchParams(location.search);
+const NAME=params.get('name')||'SJT'; $('#who').textContent=NAME;
+const STORE_KEY='sjt_birthday_messages_draft';
+
+const form=$('#f'), out=$('#msg'), preview=$('#preview');
+function sanitize(s){ return String(s||'').replace(/[\u0000-\u001F\u007F<>]/g,'').trim(); }
+function emailOK(e){ return !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function success(t){ out.innerHTML=`<div class="success">${t}</div>`; }
+function error(t){ out.innerHTML=`<div class="error">${t}</div>`; }
+function list(){ try{return JSON.parse(localStorage.getItem(STORE_KEY)||'[]')}catch{return []} }
+function save(m){ const a=list(); a.push(m); localStorage.setItem(STORE_KEY, JSON.stringify(a)); preview.textContent=JSON.stringify(a,null,2); }
+preview.textContent=JSON.stringify(list(),null,2);
+
+form.addEventListener('submit', (e)=>{
+  e.preventDefault(); out.innerHTML='';
+  const data={
+    from:sanitize($('#from').value),
+    role:sanitize($('#role').value),
+    email:sanitize($('#email').value),
+    text:sanitize($('#text').value),
+    at:new Date().toISOString(),
+    target:NAME
+  };
+  if($('#hp').value) return error('Bot detected.');
+  if(!data.from || !data.text) return error('Please fill your name and a message.');
+  if(!emailOK(data.email)) return error('Email looks invalid.');
+  save({from:data.from, role:data.role, text:data.text});
+  success('Saved locally in preview. Paste this JSON into /messages.json or the messages page.');
+  form.reset();
+});
+</script>
+
+<!--
+HOW TO USE
+1) Save as /birthday-form.html and share internally.
+2) Colleagues write messages; they appear in the preview JSON box below.
+3) Copy the JSON array and place it into /messages.json like:
+  {"messages":[ ...copied array here... ]}
+4) Open /birthday.html?name=SJT&data=/messages.json to display them.
+-->
+</body></html>

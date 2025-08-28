@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SJT Snake — Unlock</title><style>
+:root{--bg:#0c0f13;--panel:#11161d;--grid:#1b2631;--snake:#6df7c1;--head:#b8ffd8;--food:#ffd166;--wall:#314458;--text:#e6eef7;--ok:#76ff7a;--bad:#ff6b6b;--border:#8ab4ff}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;display:grid;place-items:center;background:#0f141a;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace}
+.wrap{width:min(95vw,900px)}header{text-align:center;margin:8px 0 10px}h1{margin:0;font-size:clamp(18px,2.4vw,28px)}header p{margin:4px 0 0;opacity:.8;font-size:13px}
+.board{background:linear-gradient(180deg,#0f141a,var(--panel));border-radius:16px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05)}
+canvas{width:100%;display:block;border-radius:10px;background:#0e141b}
+.hud{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px}
+.pill{background:#0d1218;border:1px solid #1e2a38;border-radius:999px;padding:6px 10px;font-size:12px}
+.btn{cursor:pointer;border:1px solid #1e2a38;background:#0d1218;color:#8ab4ff;border-radius:10px;padding:8px 12px;font-weight:600;font-size:12px}
+.overlay{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,7,11,.7);backdrop-filter:blur(3px)}
+.card{width:min(90vw,560px);background:var(--panel);border:1px solid #243244;border-radius:14px;padding:18px;text-align:center}
+</style></head><body>
+<div class="wrap"><header>
+  <h1>🐍 SJT Snake — Navigate the Initials to Unlock</h1>
+  <p>Eat <span id="goalText">7</span> snacks to unlock. Arrows/WASD, P to pause.</p>
+</header>
+<div class="board">
+  <canvas id="game" width="720" height="520" aria-label="SJT Snake"></canvas>
+  <div class="hud"><div class="pill">Score: <span id="score">0</span></div><div class="pill">Best: <span id="best">0</span></div>
+    <div style="display:flex;gap:8px"><button class="btn" id="restartBtn">Restart</button><button class="btn" id="pauseBtn">Pause</button></div>
+  </div>
+</div></div>
+<div class="overlay" id="start"><div class="card"><h2>Welcome to SJT Snake</h2><p>Avoid the SJT walls. Reach the goal to open the birthday page.</p><p><button class="btn" id="play">Play</button></p></div></div>
+<div class="overlay" id="over"><div class="card"><h2 style="color:var(--bad)">Game Over</h2><p><button class="btn" id="again">Try Again</button></p></div></div>
+<div class="overlay" id="win"><div class="card"><h2 style="color:var(--ok)">Nice! 🎉</h2><p><button class="btn" id="unlock">Open Birthday Messages</button></p></div></div>
+<script>
+const $=s=>document.querySelector(s), css=p=>getComputedStyle(document.documentElement).getPropertyValue(p);
+const params=new URLSearchParams(location.search), GOAL=+(params.get('goal')||7), TO=params.get('to')||'/birthday.html?name=SJT&data=/messages.json';
+$('#goalText').textContent=GOAL;
+const C=$('#game'), X=C.getContext('2d');
+const W=36,H=26,S=Math.floor(Math.min(C.width/W,C.height/H)),OX=Math.floor((C.width-W*S)/2),OY=Math.floor((C.height-H*S)/2);
+const SPEED0=180,SPEEDMIN=120; let best=+(localStorage.getItem('sjt_best')||0); $('#best').textContent=best;
+const K={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
+const walls=new Set(), key=(x,y)=>x+","+y, box=(x,y,w,h)=>{for(let i=0;i<w;i++) for(let j=0;j<h;j++) walls.add(key(x+i,y+j));};
+(()=>{const t=5; let x=3,y=t; box(x,y,8,1); box(x,y+1,1,5); box(x,y+6,8,1); box(x+7,y+7,1,5); box(x,y+12,8,1); x=26;y=t; box(x, y,8,1); box(x+4,y+1,1,10); box(x,y+11,5,1); box(x,y+9,1,2); x=14;y=t; box(x, y,9,1); box(x+4,y+1,1,12); box(12,12,2,6); box(23,14,2,6); box(6,20,3,1); box(15,18,1,3); box(28,19,3,1);})();
+let snake,dir,next,food,score,timer,speed,run=false,pause=false,border=css('--border');
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a, free=(x,y)=>x>=0&&y>=0&&x<W&&y<H&&!walls.has(key(x,y))&&!snake.some(s=>s.x==x&&s.y==y);
+function placeFood(){let tries=0; do{food={x:rnd(0,W-1),y:rnd(0,H-1)}; if(++tries>400) break;}while(!free(food.x,food.y))}
+function drawCell(x,y,c){X.fillStyle=c;X.fillRect(OX+x*S,OY+y*S,S,S)}
+function grid(){X.strokeStyle=css('--grid');X.lineWidth=1;X.beginPath();for(let i=0;i<=W;i++){X.moveTo(OX+i*S+.5,OY+.5);X.lineTo(OX+i*S+.5,OY+H*S+.5)}for(let j=0;j<=H;j++){X.moveTo(OX+.5,OY+j*S+.5);X.lineTo(OX+W*S+.5,OY+j*S+.5)}X.stroke();X.strokeStyle=border;X.lineWidth=2;X.strokeRect(OX,OY,W*S,H*S)}
+function render(){X.clearRect(0,0,C.width,C.height); X.fillStyle='#0d131a'; X.fillRect(OX,OY,W*S,H*S); grid(); walls.forEach(k=>{let [x,y]=k.split(',').map(Number); drawCell(x,y,css('--wall'))}); drawCell(food.x,food.y,css('--food')); for(let i=snake.length-1;i>=0;i--) drawCell(snake[i].x,snake[i].y,i?css('--snake'):css('--head'))}
+function tick(){ if(!run||pause) return; dir=next; let h={...snake[0]}; h.x+=dir[0]; h.y+=dir[1]; if(h.x<0||h.y<0||h.x>=W||h.y>=H||walls.has(key(h.x,h.y))||snake.some(s=>s.x==h.x&&s.y==h.y)) return over(); snake.unshift(h); if(h.x==food.x&&h.y==food.y){ score++; best=Math.max(best,score); localStorage.setItem('sjt_best',best); $('#score').textContent=score; $('#best').textContent=best; placeFood(); if(!(score%3)) speed=Math.max(SPEEDMIN,speed-3); clearInterval(timer); timer=setInterval(tick,speed); if(score>=GOAL) return win(); } else snake.pop(); render(); }
+function start(){ if(run) return; run=true; pause=false; clearInterval(timer); timer=setInterval(tick,speed); $('#start').style.display='none'; $('#over').style.display='none'; $('#win').style.display='none'; }
+function reset(){ score=0; speed=SPEED0; run=false; pause=false; border=css('--border'); snake=[{x:2,y:H-4},{x:1,y:H-4},{x:0,y:H-4}]; dir=[1,0]; next=[1,0]; placeFood(); $('#score').textContent=score; render(); }
+function over(){ run=false; clearInterval(timer); border=css('--bad'); render(); $('#over').style.display='grid'; }
+function win(){ run=false; clearInterval(timer); $('#win').style.display='grid'; }
+addEventListener('keydown',e=>{ if(K[e.key]){ let nd=K[e.key]; if(snake.length>1&&nd[0]==-dir[0]&&nd[1]==-dir[1]) return; next=nd; e.preventDefault(); } if(e.key=='p'||e.key=='P') pause=!pause; if(e.key=='r'||e.key=='R'){ reset(); start(); } },{passive:false});
+$('#play').onclick=()=>start(); $('#again').onclick=()=>{reset();start()}; $('#restartBtn').onclick=()=>{reset();start()}; $('#pauseBtn').onclick=()=>pause=!pause; $('#unlock').onclick=()=>location.href=TO;
+let t0=null; C.addEventListener('touchstart',e=>t0=e.changedTouches[0],{passive:true}); C.addEventListener('touchend',e=>{ if(!t0) return; let t=e.changedTouches[0],dx=t.clientX-t0.clientX,dy=t.clientY-t0.clientY; next=Math.abs(dx)>Math.abs(dy)?[dx>0?1:-1,0]:[0,dy>0?1:-1]; t0=null; },{passive:true});
+reset(); $('#start').style.display='grid';
+</script></body></html>

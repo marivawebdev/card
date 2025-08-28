@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Happy Birthday — Messages</title><style>
+:root{--bg:#0c0f13;--panel:#11161d;--grid:#1b2631;--text:#e6eef7;--accent:#8ab4ff;--ok:#76ff7a;--bad:#ff6b6b;--card:#0e141b;--border:#8ab4ff}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#0f141a;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;}
+.wrap{width:min(95vw,1100px);margin:0 auto;padding:20px}
+header{text-align:center;margin:14px 0 18px}
+h1{margin:0;font-size:clamp(22px,3vw,34px)}
+.subtitle{opacity:.8;margin-top:6px}
+.panel{background:linear-gradient(180deg,#0f141a,var(--panel));border-radius:16px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.05)}
+.border{position:relative}
+.border:before{content:"";position:absolute;inset:8px;border-radius:12px;border:2px solid var(--border);pointer-events:none}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.search{flex:1 1 260px;display:flex;gap:8px}
+input,select,button{background:#0d1218;border:1px solid #1e2a38;color:var(--accent);border-radius:10px;padding:10px 12px;font-weight:600;font-size:12px}
+button:hover{filter:brightness(1.1);cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid #243244;border-radius:12px;padding:14px;min-height:140px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.msg{line-height:1.5}
+.from{margin-top:auto;opacity:.85;font-size:12px;display:flex;align-items:center;gap:8px}
+.badge{background:#0d1218;border:1px solid #1e2a38;border-radius:999px;padding:4px 8px;font-size:11px;color:#cfe2ff}
+hr.sep{border:0;border-top:1px dashed #223040;margin:10px 0}
+footer{margin-top:16px;text-align:center;opacity:.8;font-size:12px}
+.glow{box-shadow:0 0 0 0 rgba(138,180,255,.6);animation:glow 1.8s ease-in-out infinite alternate}
+@keyframes glow{to{box-shadow:0 0 18px 0 rgba(138,180,255,.25)}}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:1}
+</style></head><body>
+<canvas class="confetti" id="confetti"></canvas>
+<div class="wrap">
+  <header>
+    <h1>🎉 Happy Birthday, <span id="who">SJT</span>!</h1>
+    <div class="subtitle">Your teammates left you some notes in glorious retro style.</div>
+  </header>
+
+  <section class="panel border glow">
+    <div class="controls">
+      <div class="search">
+        <input id="q" type="search" placeholder="Filter messages… (name or text)">
+        <select id="sort">
+          <option value="recent">Newest first</option>
+          <option value="alpha">Sender A–Z</option>
+          <option value="shuffle">Shuffle</option>
+        </select>
+        <button id="copyBtn">Copy link</button>
+      </div>
+      <div class="search">
+        <button id="small">Small</button>
+        <button id="medium">Medium</button>
+        <button id="large">Large</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <footer>Tip: add <code>?name=SJT</code> to set the name. Add <code>?data=/messages.json</code> to load from a JSON file (or edit the inline JSON below).</footer>
+  </section>
+</div>
+
+<!-- Inline fallback JSON (edit or replace) -->
+<script id="msgdata" type="application/json">
+{
+  "messages": [
+    {"from":"Ana","role":"Design","text":"Happy birthday! Thanks for always unblocking my PRs at lightning speed."},
+    {"from":"Mark","role":"Backend","text":"Hope your day compiles without errors and runs in O(1) joy."},
+    {"from":"Priya","role":"PM","text":"Wishing you infinite retries, zero bugs and many cake commits!"},
+    {"from":"Liam","role":"QA","text":"I tried to break your day. Test failed. Have an awesome birthday!"}
+  ]
+}
+</script>
+
+<script>
+const params=new URLSearchParams(location.search);
+const RECIPIENT=params.get('name')||'SJT';
+document.getElementById('who').textContent=RECIPIENT;
+const dataUrl=params.get('data'); // optional external JSON
+
+async function loadMessages(){
+  if(dataUrl){
+    try{
+      const res=await fetch(dataUrl,{cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const j=await res.json();
+      return j.messages||[];
+    }catch(e){
+      console.error('Failed to load external JSON:', e);
+      return inlineMsgs();
+    }
+  }
+  return inlineMsgs();
+}
+function inlineMsgs(){
+  try { return JSON.parse(document.getElementById('msgdata').textContent).messages||[]; }
+  catch { return []; }
+}
+
+// --- Render ---
+const grid=document.getElementById('grid');
+let all=[], view=[];
+const safe=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const card=m=>`<article class="card"><div class="msg">${safe(m.text)}</div><hr class="sep"><div class="from"><span class="badge">${safe(m.role||'')}</span><span>— ${safe(m.from||'Anonymous')}</span></div></article>`;
+function paint(){ grid.innerHTML=view.map(card).join(''); }
+
+function apply(){
+  const q=document.getElementById('q').value.trim().toLowerCase();
+  const s=document.getElementById('sort').value;
+  let arr=all.filter(m=>!q||(m.text||'').toLowerCase().includes(q)||(m.from||'').toLowerCase().includes(q));
+  if(s==='alpha') arr.sort((a,b)=>String(a.from).localeCompare(String(b.from)));
+  else if(s==='shuffle') arr=shuffle(arr);
+  else arr=arr; // recent: keep current order (assume newest last in source; we reverse on boot)
+  view=arr; paint();
+}
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// Controls
+document.getElementById('q').addEventListener('input',apply);
+document.getElementById('sort').addEventListener('change',apply);
+document.getElementById('small').onclick=()=>grid.style.setProperty('grid-template-columns','repeat(auto-fill,minmax(200px,1fr))');
+document.getElementById('medium').onclick=()=>grid.style.setProperty('grid-template-columns','repeat(auto-fill,minmax(240px,1fr))');
+document.getElementById('large').onclick=()=>grid.style.setProperty('grid-template-columns','repeat(auto-fill,minmax(320px,1fr))');
+document.getElementById('copyBtn').onclick=()=>navigator.clipboard.writeText(location.href);
+
+// Confetti
+const conf=document.createElement('canvas'); // (omit canvas duplication if already present)
+</script>
+
+<script>
+// Confetti (simple, lightweight)
+const confetti=document.getElementById('confetti'), ctx=confetti.getContext('2d');
+function size(){confetti.width=innerWidth; confetti.height=innerHeight;} size(); addEventListener('resize',size);
+const bits=Array.from({length:90},()=>({x:Math.random()*innerWidth,y:Math.random()*-200,vy:1+Math.random()*2,s:2+Math.random()*3,h:200+Math.random()*120}));
+(function anim(){ctx.clearRect(0,0,confetti.width,confetti.height); bits.forEach(b=>{ctx.fillStyle=`hsl(${b.h},80%,60%)`; ctx.fillRect(b.x,b.y,b.s,b.s); b.y+=b.vy; if(b.y>confetti.height){b.y=-10;b.x=Math.random()*confetti.width;} }); requestAnimationFrame(anim)})();
+
+// Boot
+loadMessages().then(ms=>{ all=ms.slice().reverse(); view=all; paint(); });
+</script>
+</body></html>

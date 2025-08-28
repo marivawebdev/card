@@ -1,0 +1,14 @@
+{
+  "messages": [
+    {
+      "from": "Alice",
+      "role": "FE",
+      "text": "Happy birthday! \ud83c\udf82"
+    },
+    {
+      "from": "Bob",
+      "role": "BE",
+      "text": "Have a brilliant day \ud83c\udf89"
+    }
+  ]
+}
